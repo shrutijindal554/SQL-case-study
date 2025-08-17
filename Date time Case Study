@@ -1,0 +1,180 @@
+Q1-Find the month with most number of flights.
+
+SELECT MONTHNAME(Date_of_Journey),COUNT(*) 
+FROM campusx.`flights - flights`
+GROUP BY MONTHNAME(Date_of_Journey)
+ORDER BY COUNT(*) DESC LIMIT 1
+
+Q2- Which week day has most costly flights.
+
+SELECT DAYNAME(Date_of_Journey),AVG(Price) FROM
+campusx.`flights - flights`
+GROUP BY DAYNAME(Date_of_Journey)
+ORDER BY AVG(Price) DESC LIMIT 1
+
+Q3- Find number of indigo flights every month.
+
+SELECT MONTHNAME(Date_of_Journey),COUNT(*) FROM campusx.`flights - flights`
+WHERE Airline='IndiGo'
+GROUP BY  MONTHNAME(Date_of_Journey)
+ORDER BY  MONTHNAME(Date_of_Journey) ASC
+
+Q4- Find list of all flights that depart between 10 AM and 2PM from Bangalore to Delhi.
+
+SELECT Airline FROM campusx.`flights - flights`
+WHERE Source='Banglore' AND Destination= 'Delhi' 
+AND Dep_Time > '10:00:00' AND  Dep_Time < '14:00:00'
+
+Q5- Find the number of flights departing on weekends from Bangalore.
+
+SELECT COUNT(*)  FROM campusx.`flights - flights`
+WHERE Source='Bangalore AND DAYNAME(Date_of_Journey)
+IN ('Saturday','Sunday')
+
+Q6- Calculate the arrival time for all flights by adding duration to the departure time.
+
+ALTER TABLE `flights - flights` ADD COLUMN departure DATETIME
+     
+       
+SELECT str_to_date(CONCAT(Date_of_Journey,' ' ,Dep_Time),
+'%Y-%m-%d %H:%i') FROM `flights - flights`
+set sql_safe_updates=0
+
+UPDATE `flights - flights`
+SET departure = str_to_date(CONCAT(Date_of_Journey,
+' ' ,Dep_Time),'%Y-%m-%d %H:%i')
+
+ALTER TABLE `flights - flights`
+ADD COLUMN duration_mins INTEGER,
+ADD COLUMN arrival DATETIME
+
+  
+UPDATE `flights - flights`
+SET duration_mins =
+COALESCE(CAST(REGEXP_SUBSTR(duration, '([0-9]+)(?=h)') AS UNSIGNED), 0) * 60 +
+COALESCE(CAST(REGEXP_SUBSTR(duration, '([0-9]+)(?=m)') AS UNSIGNED), 0)
+
+SELECT departure,duration_mins,DATE_ADD(departure,INTERVAL duration_mins MINUTE)
+FROM `flights - flights`
+
+UPDATE `flights - flights`
+SET arrival=DATE_ADD(departure,INTERVAL duration_mins MINUTE)
+
+
+SELECT TIME(arrival) FROM `flights - flights`
+
+
+Q7- Calculate the arrival date for all the flights.
+
+SELECT DATE(arrival) FROM `flights - flights`;
+
+Q8- Find the number of flights which travel on multiple dates.
+
+SELECT COUNT(*) FROM `flights - flights`
+WHERE DATE(arrival) != DATE(departure);
+
+
+Q9- Calculate the average duration of flights between all city pairs.
+
+SELECT TIME_FORMAT(SEC_TO_TIME(AVG(duration_mins)*60),'%kh:%im') AS 'AVG_DURATION',Source,Destination FROM `flights - flights`
+GROUP BY Source,Destination
+
+Q10-Find all flights which departed before midnight but arrived at their destination after midnight having only 1 stop.
+
+SELECT Airline FROM `flights - flights`
+WHERE DATE(departure) < DATE(arrival) AND
+Total_Stops='non-stop'
+
+Q 11- Find quarter wise number of flights for each airline.
+
+SELECT Airline, QUARTER(departure) ,COUNT(*) 
+FROM `flights - flights`
+GROUP BY Airline, QUARTER(departure)
+
+Q12- Find the longest flight distance(between cities in terms of time) in India.
+
+SELECT
+Source,Destination,TIME_FORMAT(SEC_TO_TIME
+(AVG(duration_mins)*60),'%kh:%im') AS 'AVG_DURATION'
+FROM `flights - flights`
+GROUP BY Source,Destination
+ORDER BY AVG_DURATION DESC LIMIT 1
+
+Q13-Average time duration for flights that have 1 stop vs more than 1 stops.
+
+WITH temp_table AS (
+SELECT *,
+    CASE
+        WHEN total_stops = 'non-stop' THEN 'non-stop'
+        ELSE 'with stop'
+    END AS temp
+FROM campusx.`flights - flights`
+)
+SELECT temp,
+TIME_FORMAT(SEC_TO_TIME(AVG(duration_mins)*60),'%kh:%im') AS 'AVG_DURATION'
+FROM temp_table
+GROUP BY temp
+
+Q14-Find all Air India flights in a given date range originating from Delhi.
+
+SELECT Airline,Source,DATE(departure) FROM 
+campusx.`flights - flights`
+WHERE Airline='Air India' AND Source='Delhi'
+AND DATE(departure) > '2019-03-01' AND 
+DATE(departure)<'2019-03-10'
+
+Q15- Find the longest flight of each airline.
+
+SELECT Airline,
+TIME_FORMAT(SEC_TO_TIME(MAX(duration_mins)*60),'%kh:%im') 
+AS 'MAX_DURATION'
+FROM `flights - flights`
+GROUP BY Airline
+ORDER BY MAX(duration_mins) DESC
+
+Q16- Find all the pair of cities having average time duration > 3 hours .
+
+SELECT TIME_FORMAT(SEC_TO_TIME(AVG(duration_mins)*60),'%kh:%im') AS 'AVG_DURATION',Source,Destination FROM `flights - flights`
+GROUP BY Source,Destination
+HAVING AVG(duration_mins) > 180
+
+
+Q17-Make a weekday vs time grid showing frequency of lights from Bangalore  and Delhi.
+
+SELECT DAYNAME(departure),
+SUM(CASE WHEN HOUR(departure) BETWEEN 0 AND 5 
+THEN 1 ELSE 0 END) AS '12AM-6AM',
+SUM(CASE WHEN HOUR(departure) BETWEEN 6 AND 11 
+THEN 1 ELSE 0 END) AS '6AM-12PM',
+SUM(CASE WHEN HOUR(departure) BETWEEN 12 AND 17 
+THEN 1 ELSE 0 END) AS '12PM -6PM',
+SUM(CASE WHEN HOUR(departure) BETWEEN 18 AND 23 
+THEN ELSE 0 END) AS '6PM-12AM'
+FROM campusx.`flights - flights`
+WHERE Source='Banglore' AND Destination='Delhi'
+GROUP BY DAYNAME(departure),DAYOFWEEK(departure)
+ORDER BY DAYOFWEEK(departure) ASC
+
+Q18-Make a weekday vs time grid showing avg flight price from Bangalore and Delhi.
+
+SELECT DAYNAME(departure),
+AVG(CASE WHEN HOUR(departure) BETWEEN 0 AND 5 THEN
+ price ELSE NULL END) AS ' 12AM-6AM',
+AVG(CASE WHEN HOUR(departure) BETWEEN 6 AND 11 THEN
+ price ELSE NULL END) AS ' 6AM-12PM',
+AVG(CASE WHEN HOUR(departure) BETWEEN 12 AND 17 THEN 
+price ELSE NULL END) AS '12PM -6PM',
+AVG(CASE WHEN HOUR(departure) BETWEEN 18 AND 23 THEN
+ price ELSE NULL END) AS '6PM-12AM'
+FROM campusx.`flights - flights`
+WHERE Source='Banglore' AND Destination='Delhi'
+GROUP BY DAYNAME(departure),DAYOFWEEK(departure)
+ORDER BY DAYOFWEEK(departure) ASC
+
+
+
+
+
+
+
+
