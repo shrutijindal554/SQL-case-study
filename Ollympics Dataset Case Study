@@ -1,0 +1,194 @@
+
+
+
+
+Q1-Retrieve all columns for Gold medal winners in Athletics during the 1908 Summer Olympics.
+
+SELECT * FROM campusx.all_olympic_medalists
+WHERE medal='Gold' AND sport='Athletics' AND year=1908
+AND season='Summer'
+
+Q2-List all distinct sports played in the Summer Olympics.
+
+SELECT DISTINCT sport FROM campusx.all_olympic_medalists
+WHERE season='Summer'
+
+Q3-Count the total number of medals won in the dataset.
+
+SELECT COUNT(*)  FROM campusx.all_olympic_medalists
+WHERE medal IS NOT NULL
+
+Q4- Find the earliest and latest Olympic years available.
+
+SELECT MIN(year), MAX(year)  FROM campusx.all_olympic_medalists
+
+Q5-Display the total number of medals won by ‘India’.
+
+SELECT COUNT(*)  FROM campusx.all_olympic_medalists
+WHERE country='India'
+
+Q6-Count the number of medals per season.
+
+SELECT COUNT(*),season FROM campusx.all_olympic_medalists
+where medal IS NOT NULL
+GROUP BY season
+
+Q7-Count the number of medals by event_gender.
+
+SELECT event_gender,COUNT(*)  FROM campusx.all_olympic_medalists
+WHERE medal IS NOT NULL
+GROUP BY event_gender
+
+Q8-Show the total medals per country in descending order.
+
+SELECT country,COUNT(*)  FROM campusx.all_olympic_medalists
+WHERE medal IS NOT NULL
+GROUP BY country
+ORDER BY COUNT(*) DESC
+
+
+Q9-Count the unique medal-winning athletes per sport.
+
+SELECT DISTINCT athletes,sport 
+FROM campusx.all_olympic_medalists
+WHERE medal IS NOT NULL
+GROUP BY sport,athletes
+
+Q10-Find the total Gold,Silver and Bronze medals won by each country.
+
+SELECT country,
+SUM(CASE WHEN medal='Gold' THEN 1 ELSE 0 END) 
+AS 'Gold_medal',
+SUM(CASE WHEN medal='Silver' THEN 1 ELSE 0 END)
+ AS 'Silver_medal',
+SUM(CASE WHEN medal='Bronze' THEN 1 ELSE 0 END) 
+AS 'Bronze_medal'
+FROM campusx.all_olympic_medalists
+GROUP BY country
+
+Q11-Count medals won per year and sport.
+
+SELECT COUNT(*) AS 'medal_count',year,sport 
+FROM campusx.all_olympic_medalists
+GROUP BY year,sport
+
+Q12- Count  medals  per country per season.
+
+SELECT COUNT(*),country,season FROM campusx.all_olympic_medalists
+WHERE medal IS NOT NULL
+GROUP BY country,season
+
+
+Q13-For each event and year,list the Gold and Silver medal winners side by side.
+
+SELECT t1.athletes AS 'goldwinner',t2.athletes as 'silverwinner',t1.year,t1.event_name,t1.country s
+FROM(SELECT year,event_name,athletes,country 
+FROM campusx.all_olympic_medalists 
+WHERE medal='Gold'
+GROUP BY year,event_name,athletes,country) t1
+JOIN
+(SELECT year,event_name,athletes,country 
+FROM campusx.all_olympic_medalists 
+WHERE medal='Silver'
+GROUP BY year,event_name,athletes,country) t2
+ON t1.country=t2.country
+
+Q14-Lists events where Gold and Silver medals went to the same country.
+
+select t1.year,t1.country,t1.event_name,t1.sport from (select year,medal,country,sport,event_name from all_olympic_medalists
+where medal ='Gold')t1
+join 
+(select year,medal,country,sport,event_name 
+from all_olympic_medalists
+where medal ='Silver')t2
+on t1.country=t2.country;
+
+Q15-For each year,find athletes from the same country winning different medals in the same event.
+
+select distinct t1.year,t1.country,t1.athletes,t2.athletes from (select year,medal,country,athletes from all_olympic_medalists)t1
+join 
+(select year,medal,country,athletes from all_olympic_medalists)t2
+on t1.country=t2.country and t1.year=t2.year
+and t1.medal!=t2.medal;
+
+Q16-List multi-sport medalists(athletes who won medals in different sports).
+
+select athletes ,count(distinct sport) as'sports_played'from all_olympic_medalists
+group by athletes
+having count(distinct sport)>1;
+
+Q17- Find the athletes with the highest career medal count.
+
+select athletes ,count(medal) from all_olympic_medalists
+group by athletes
+order by count(medal) desc
+limit 1;
+
+
+
+Q18-Retrieve all sports where USA has more Gold medals than any other country.
+
+with temp as (select sport,count(medal) as total from all_olympic_medalists
+where country ='United States' 
+group by sport )
+select sport  from temp
+where total >(
+select MAX(t.total) from (select country,sport ,count(medal)
+as 'total' from  all_olympic_medalists
+where country!= 'United States'
+group by sport,country)t
+where t.sport =temp.sport);
+
+Q19-Find countries that have never won a Gold medal.
+
+select distinct country,event_name from  all_olympic_medalists
+where country not in (select distinct country
+from  all_olympic_medalists
+where medal ='Gold');
+
+Q20-Retrieve the most recent year each country won a medal.
+
+select country ,max(year) from all_olympic_medalists
+where medal IS NOT NULL
+group by country;
+
+Q21-Find athletes who won medals in consecutive Olympics years .
+
+select distinct t1.athletes,t1.year ,t2.year from (select athletes ,year from all_olympic_medalists)t1
+join 
+(select athletes, year from all_olympic_medalists)t2
+on t1.athletes=t2.athletes and t2.year=t1.year+4;
+
+Q22-Rank countries by total medals per year.
+
+select *,dense_rank() over (partition by t.year order by t.total desc ) as 'rank_as_per_medal'
+from (select year,country,count(medal) as total 
+from all_olympic_medalists
+group by all_olympic_medalists.year,country )t;
+
+Q23-For each sport,find the top medal-winning athlete.
+
+select distinct 
+first_value(t.athletes) over(partition by t.sport order by t.total desc)
+from (select sport ,athletes ,count(medal) as total 
+from all_olympic_medalists 
+group by sport ,athletes )t;
+
+Q24-Show running total medals for each country over time.
+
+with temp as (select country ,year ,count(medal) as 'total_medal_win' from all_olympic_medalists 
+group by country,all_olympic_medalists.year)
+select *,
+sum(total_medal_win) over(partition by country rows 
+between unbounded preceding and current row) 
+as 'year_on_year_medalcount'
+from temp;
+
+Q25-Calculate year-over-year change in medal count for each country.
+
+with temp as (select country ,year ,count(medal) as 'total_medal_win' from all_olympic_medalists 
+group by country,all_olympic_medalists.year)
+select *,
+total_medal_win-lag(total_medal_win) over(partition by 
+country ) as'medal_win_compare_to_lastyear'
+from temp
